@@ -94,7 +94,13 @@ codex                    # 启动 codex
 
 之后 hook 才会真的开始触发。临时绕过可加 `--dangerously-bypass-hook-trust`(不推荐长期使用)。
 
+**重装行为**:如果你以后再跑 `./install.sh codex`(比如换了标题/图标),install.sh 会**保留** `[hooks.state]` 里 codex 写的 trust 哈希,把它移到 marker 块外面。所以:
+- 命令字符串**没变** → 哈希不变 → trust 仍生效,无需再 `/hooks`
+- 命令字符串**变了**(改了 title/icon/path) → 哈希变 → 需要重新 `/hooks` 信任
+
 > 已知 bug:codex `~/.codex/config.toml`(全局)的 hook 正常,但仓库本地 `.codex/config.toml` 在 interactive 模式下可能不触发,见 [openai/codex#17532](https://github.com/openai/codex/issues/17532)。本仓库**只动全局**配置,不受影响。
+
+> Codex 的 PermissionRequest 触发条件取决于你的 `approval_policy`:`"never"` 下 codex 会自动通过所有操作,这条 hook 永远不响;切到 `"on-request"` / `"untrusted"` 等需要确认的模式后,它会在每次 codex 要做敏感操作时响 alarm。
 
 ## 自定义配置
 

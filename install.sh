@@ -165,20 +165,56 @@ if os.path.exists(config_path):
     with open(config_path, "r", encoding="utf-8") as f:
         existing = f.read()
 
+# Codex 在用户跑 /hooks 信任后会把记录写到 [hooks.state...] 表里。
+# 实测它会把状态追加到文件尾,可能落到我们 marker 块**内部**。
+# 重装时若 marker 替换连带把 state 擦掉,用户得反复 /hooks。
+# 这里先把所有 [hooks.state...] 段从文件里抽出来,等 marker 替换完再放回 marker 块**外面**。
+state_header_re = re.compile(r"^\[\[?hooks\.state\b")
+# state 段结束的条件:新的非 state 表头 [xxx],或者我们自己的 marker 注释
+end_of_state_re = re.compile(r"^(\[|# (>>>|<<<) bark-notify codex hooks)")
+
+def extract_state_tables(s):
+    """返回 (state_text, content_without_state)。
+    把每个 [hooks.state] / [hooks.state."..."] 子表(包括下面的 key=value 行)抽出来。"""
+    state_lines, out_lines = [], []
+    in_state = False
+    for line in s.split("\n"):
+        stripped = line.strip()
+        if state_header_re.match(stripped):
+            in_state = True
+            state_lines.append(line)
+        elif in_state and end_of_state_re.match(stripped):
+            # 进入新的非 state 表头或闭合 marker,state 段结束
+            in_state = False
+            out_lines.append(line)
+        elif in_state:
+            state_lines.append(line)
+        else:
+            out_lines.append(line)
+    return "\n".join(state_lines).strip(), "\n".join(out_lines)
+
+saved_state, existing_clean = extract_state_tables(existing)
+
 pattern = re.compile(
     r"\n*# >>> bark-notify codex hooks >>>.*?# <<< bark-notify codex hooks <<<\n*",
     re.DOTALL,
 )
-if pattern.search(existing):
-    new_content = pattern.sub("\n\n" + block, existing).lstrip("\n")
+if pattern.search(existing_clean):
+    new_content = pattern.sub("\n\n" + block, existing_clean).lstrip("\n")
     action = "更新"
 else:
-    new_content = (existing.rstrip() + "\n\n" + block) if existing else block
+    new_content = (existing_clean.rstrip() + "\n\n" + block) if existing_clean else block
     action = "追加"
+
+# 把保留下来的 codex trust 状态追加到 marker 块外面
+state_msg = ""
+if saved_state:
+    new_content = new_content.rstrip() + "\n\n" + saved_state + "\n"
+    state_msg = f" (保留 codex trust 记录 {saved_state.count('trusted_hash')} 条)"
 
 with open(config_path, "w", encoding="utf-8") as f:
     f.write(new_content)
-print(f"✓ {action} hook 块到 {config_path}(marker 之间)")
+print(f"✓ {action} hook 块到 {config_path}(marker 之间){state_msg}")
 PYEOF
 
   # 验证生成的 TOML 合法,且 hook 块结构正确
