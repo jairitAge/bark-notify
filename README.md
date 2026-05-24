@@ -12,8 +12,50 @@
 ## 前置条件
 
 - macOS 或 Linux,自带 `bash` / `curl` / `python3`
-- iPhone 装 Bark App,拿到 Device Key
+- iPhone 装 [Bark App](https://apps.apple.com/app/bark-customed-notifications/id1403753865),拿到 Device Key
 - 配 Codex 那条路径需要 `codex` CLI ≥ 0.133
+
+## 配置项总览(`.env` 字段)
+
+复制 `.env.example` 为 `.env` 后,要填这几项:
+
+| 字段 | 必填 | 含义 | 怎么填 |
+|---|:-:|---|---|
+| `BARK_DEVICE_KEY` | ✅ | Bark 给你 iPhone 的唯一推送凭证 | 见下方「获取 Device Key」 |
+| `BARK_SERVER` | — | Bark 服务器 URL | 默认 `https://api.day.app`(官方);自建服务器换成自己的域名 |
+| `BARK_TITLE` | — | **Claude Code** 推送的标题 | 任意字符串,中文/空格直接写、无需引号。例:`Claude Code LOCAL` |
+| `BARK_ICON` | — | **Claude Code** 推送的图标 URL | 公开可访问的 HTTP/HTTPS 图片;留空则不带图标。见下方「图标 URL」 |
+| `CODEX_TITLE` | — | **Codex** 推送的标题 | 同 `BARK_TITLE`,但用于 Codex。例:`Codex LOCAL` |
+| `CODEX_ICON` | — | **Codex** 推送的图标 URL | 同 `BARK_ICON`,但用于 Codex |
+
+> Claude 和 Codex 的标题/图标分两套,是为了在 iPhone 通知中一眼区分是哪边发的。
+
+### 获取 Device Key
+
+打开 iPhone 上的 **Bark App** → 首页正上方会显示一段 URL,格式像:
+
+```
+https://api.day.app/<your-device-key>/
+                    └────── Device Key ──────┘
+```
+
+中间那段约 22 个字母数字混合的字符串就是你的 Device Key。点右上角图标可以「复制 URL」/「复制 Key」,把 Key 单独复制出来填到 `.env` 里。
+
+> **Device Key 等价于一把推送钥匙** —— 任何人拿到 key 都能给你 iPhone 推任意通知。**别发到聊天、别贴到公开 issue、别 commit 到任何 git 仓库**。本仓库的 `.gitignore` 会拦截 `.env`,所以正常使用不会泄露。
+> 如果不小心公开了:打开 Bark App → 设置 → 重新生成 Key,旧 key 立即失效。
+
+### 图标 URL 怎么获取
+
+- **必须是公开可访问的 HTTP/HTTPS URL** —— Bark 服务端会去这个 URL 拉图片,再推到你的 iPhone。
+- 推荐:正方形 PNG,边长 ≥ 100 px。GIF/JPG 也行,但 PNG 最稳。
+- **不能用** `file://` 或本地路径,Bark 服务器拉不到。
+- **留空**(`BARK_ICON=`)→ 推送不带图标。
+- **现成图标库**:[jairitAge/bark-icons](https://github.com/jairitAge/bark-icons) 里有 `claude.png` 和 `codex.png`,直接用 raw 链接填进去:
+  ```
+  https://raw.githubusercontent.com/jairitAge/bark-icons/main/claude.png
+  https://raw.githubusercontent.com/jairitAge/bark-icons/main/codex.png
+  ```
+- **想用自己的图**:传到任意公开图床(imgur / GitHub raw / 自建 CDN),拿到 raw 直链填进来即可。
 
 ## 一键安装
 
@@ -90,14 +132,6 @@ $EDITOR .env                  # 改 CODEX_TITLE / CODEX_ICON
 ```
 
 也可以直接编辑 `~/.codex/config.toml` 里 marker 块之间的 `command = '...'` 字段,但 marker 之间的内容下次跑 `install.sh codex` 会被覆盖。
-
-### 图标 URL 要求
-
-- 必须是**公开可访问**的 HTTP/HTTPS URL —— Bark 服务端会去拉这张图。
-- 推荐:正方形 PNG,边长 ≥ 100 px。
-- 不能用 `file://` 或本地路径。
-- 留空(`BARK_ICON=`)则推送不带图标。
-- 现成图标库:[jairitAge/bark-icons](https://github.com/jairitAge/bark-icons),用 `https://raw.githubusercontent.com/jairitAge/bark-icons/main/<文件名>` 直接填。
 
 ## 卸载
 
