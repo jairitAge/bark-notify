@@ -28,6 +28,7 @@ while [ $# -gt 0 ]; do
     --sound) SOUND="$2"; shift 2;;
     --body)  BODY="$2";  shift 2;;
     --title) BARK_TITLE="$2"; shift 2;;
+    --icon)  BARK_ICON="$2"; shift 2;;
     *)       shift;;
   esac
 done

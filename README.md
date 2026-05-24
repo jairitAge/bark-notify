@@ -20,20 +20,23 @@
 cp .env.example .env
 $EDITOR .env
 
-# 2. 安装到 Claude Code
-./install.sh claude
-
-# 或同时给 Claude Code + Codex
-./install.sh both
+# 2. 三选一:
+./install.sh claude   # 只配 Claude Code(默认)
+./install.sh codex    # 只配 Codex CLI,不动 Claude 现有 settings.json
+./install.sh both     # 同时配两边
 ```
 
-脚本会:
+三种模式干的事:
 
-1. 写 `~/.claude/notify-bark.conf`(mode 600,只有你能读)。
-2. 安装 `~/.claude/notify-bark.sh`。
-3. **合并** Stop / Notification 两个钩子到 `~/.claude/settings.json`(保留你已有的其他配置)。
-4. 发一条测试推送验证。
-5. 选 `codex` / `both` 时,额外打印 Codex 的 shell 函数包装片段,自行粘到 `~/.zshrc`。
+| 步骤 | claude | codex | both |
+|---|:-:|:-:|:-:|
+| 写 `~/.claude/notify-bark.conf`(mode 600) | ✓ | ✓ | ✓ |
+| 装 `~/.claude/notify-bark.sh`(已存在则先 `.bak.<时间戳>` 备份) | ✓ | ✓ | ✓ |
+| 合并 Stop/Notification 到 `~/.claude/settings.json`(保留其他键) | ✓ | — | ✓ |
+| 发一条 Claude 测试推送 | ✓ | — | ✓ |
+| 打印 Codex shell 包装函数 + 发一条 Codex 测试推送 | — | ✓ | ✓ |
+
+`codex` 模式适合你已经手工配好了 Claude Code 推送、不想被覆盖的情况 —— 这条路径完全不碰 `settings.json`,只装共享的 conf + script,然后让你把打印出来的 shell 函数贴到 `~/.zshrc`。
 
 ## 自定义配置
 
@@ -42,9 +45,11 @@ $EDITOR .env
 | 配置项 | 存在哪 | 生效时机 |
 |---|---|---|
 | Device Key | `~/.claude/notify-bark.conf` 的 `BARK_DEVICE_KEY` | **立刻** —— 下一次推送即用新值 |
-| 通知**标题** | `~/.claude/notify-bark.conf` 的 `BARK_TITLE` | **立刻** —— 下一次推送即用新值 |
-| 通知**图标** | `~/.claude/notify-bark.conf` 的 `BARK_ICON` | **立刻** —— 下一次推送即用新值 |
-| 声音(`bell`/`alarm` 等) | `~/.claude/settings.json` 里 hook command 的 `--sound` 参数 | 需**新开 Claude Code 会话**才生效 |
+| Claude 通知**标题** | `~/.claude/notify-bark.conf` 的 `BARK_TITLE` | **立刻** —— 下一次推送即用新值 |
+| Claude 通知**图标** | `~/.claude/notify-bark.conf` 的 `BARK_ICON` | **立刻** —— 下一次推送即用新值 |
+| Codex 通知**标题** | `.env` 的 `CODEX_TITLE`,由 install.sh 嵌进 wrapper 的 `--title` 参数 | 重跑 `./install.sh codex` / `both` 后,重新粘 wrapper 到 `~/.zshrc` |
+| Codex 通知**图标** | `.env` 的 `CODEX_ICON`,由 install.sh 嵌进 wrapper 的 `--icon` 参数 | 同上 |
+| 声音(`bell`/`alarm` 等) | `~/.claude/settings.json` 里 hook command 的 `--sound` 参数(Claude),或 wrapper 里的 `--sound`(Codex) | 需**新开 Claude Code 会话**(或重新 source `~/.zshrc`)才生效 |
 | Stop 时的固定**正文**(默认「任务完成」) | `~/.claude/settings.json` 里 Stop hook command 的 `--body` 参数 | 需**新开 Claude Code 会话**才生效 |
 
 > 原理:`notify-bark.sh` 每次被 hook 触发时都重新 `source` 一遍 conf,所以 conf 改完立刻反映;而 `settings.json` 是 Claude Code 启动时加载的,改完要重开会话(`/exit` 后重新进 `claude`)才会重读。

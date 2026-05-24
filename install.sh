@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # bark-notify 安装脚本。
 # 用法: ./install.sh [claude|codex|both]   默认 claude
+#
+# - claude: 装共享文件 + 合并 Stop/Notification 钩子到 ~/.claude/settings.json
+# - codex:  只装共享文件,然后打印 Codex shell wrapper(不改 settings.json)
+# - both:   = claude + codex 的 wrapper 打印
 
 set -euo pipefail
 
@@ -45,15 +49,24 @@ fi
 : "${BARK_SERVER:=https://api.day.app}"
 : "${BARK_TITLE:=Claude Code}"
 : "${BARK_ICON:=}"
+: "${CODEX_TITLE:=Codex}"
+: "${CODEX_ICON:=https://raw.githubusercontent.com/jairitAge/bark-icons/main/codex.png}"
 
 CLAUDE_DIR="$HOME/.claude"
 CONF="$CLAUDE_DIR/notify-bark.conf"
 SCRIPT="$CLAUDE_DIR/notify-bark.sh"
 SETTINGS="$CLAUDE_DIR/settings.json"
 
-# ---------- 2. 安装 Claude Code 钩子 ----------
-install_claude() {
+# ---------- 2. 共享文件:conf + script(+ 自动备份现有不同版本) ----------
+install_shared() {
   mkdir -p "$CLAUDE_DIR"
+
+  # 备份现有 notify-bark.sh(只要内容跟仓库版本不同就备份一份,免得用户原脚本丢失)
+  if [ -f "$SCRIPT" ] && ! cmp -s "$REPO_DIR/notify-bark.sh" "$SCRIPT"; then
+    bak="$SCRIPT.bak.$(date +%Y%m%d-%H%M%S)"
+    cp "$SCRIPT" "$bak"
+    echo "↩ 备份现有脚本到 $bak"
+  fi
 
   # 写 conf,权限 600
   umask 077
@@ -70,8 +83,10 @@ EOF
   # 拷贝脚本
   install -m 0755 "$REPO_DIR/notify-bark.sh" "$SCRIPT"
   echo "✓ 安装 $SCRIPT"
+}
 
-  # 合并到 settings.json(保留其他键)
+# ---------- 3. Claude Code 钩子合并 ----------
+install_claude_hooks() {
   python3 - "$SETTINGS" "$SCRIPT" <<'PYEOF'
 import json, os, sys
 settings_path, script_path = sys.argv[1], sys.argv[2]
@@ -100,37 +115,63 @@ print(f"✓ 合并钩子到 {settings_path}")
 PYEOF
 
   echo
-  echo "发送测试推送..."
-  echo '{"message":"bark-notify 安装成功"}' | bash "$SCRIPT"
-  echo "✓ 测试推送已发出,请查看 iPhone。"
+  echo "发送 Claude 测试推送..."
+  echo '{"message":"bark-notify Claude 安装成功"}' | bash "$SCRIPT"
+  echo "✓ Claude 测试推送已发出,请查看 iPhone。"
 }
 
-# ---------- 3. Codex CLI 集成提示 ----------
-install_codex() {
+# ---------- 4. Codex wrapper 提示 + 验证推送 ----------
+install_codex_wrapper() {
   cat <<EOF
 
 ------------------------------------------------------------
-Codex CLI 没有原生 hook 机制,用 shell 函数包装即可:
+Codex CLI 没有原生 hook 机制,用 shell 函数包装即可。
 
 把下面这段加到 ~/.zshrc(或 ~/.bashrc):
 
   codex() {
     command codex "\$@"
     local code=\$?
-    bash "$SCRIPT" --sound bell --body "codex 完成 (exit \$code)"
+    bash "$SCRIPT" \\
+      --sound bell \\
+      --title "$CODEX_TITLE" \\
+      --icon "$CODEX_ICON" \\
+      --body "codex 完成 (exit \$code)"
     return \$code
   }
 
 然后执行 'source ~/.zshrc' 让配置生效。
 ------------------------------------------------------------
 EOF
+
+  echo
+  echo "发送 Codex 测试推送(标题/图标用 CODEX_TITLE / CODEX_ICON)..."
+  bash "$SCRIPT" \
+    --sound bell \
+    --title "$CODEX_TITLE" \
+    --icon "$CODEX_ICON" \
+    --body "bark-notify Codex 验证推送"
+  echo "✓ Codex 测试推送已发出,请查看 iPhone 是否收到标题为「${CODEX_TITLE}」、带 codex 图标的通知。"
 }
 
 case "$TARGET" in
-  claude) install_claude ;;
-  codex)  install_claude; install_codex ;;
-  both)   install_claude; install_codex ;;
-  *) echo "用法: $0 [claude|codex|both]" >&2; exit 1 ;;
+  claude)
+    install_shared
+    install_claude_hooks
+    ;;
+  codex)
+    install_shared
+    install_codex_wrapper
+    ;;
+  both)
+    install_shared
+    install_claude_hooks
+    install_codex_wrapper
+    ;;
+  *)
+    echo "用法: $0 [claude|codex|both]" >&2
+    exit 1
+    ;;
 esac
 
 echo
