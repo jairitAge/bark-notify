@@ -35,8 +35,8 @@
 打开 iPhone 上的 **Bark App** → 首页正上方会显示一段 URL,格式像:
 
 ```
-https://api.day.app/<your-device-key>/
-                    └────── Device Key ──────┘
+https://api.day.app/<这一段就是你的 Device Key>/
+                    └─────────── 22 字符 ───────────┘
 ```
 
 中间那段约 22 个字母数字混合的字符串就是你的 Device Key。点右上角图标可以「复制 URL」/「复制 Key」,把 Key 单独复制出来填到 `.env` 里。
